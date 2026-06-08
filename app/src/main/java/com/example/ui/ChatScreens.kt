@@ -50,7 +50,9 @@ fun ChatApp(
     val messageInput by viewModel.messageInput.collectAsState()
     val editingProfile by viewModel.editingProfile.collectAsState()
     val usernameDraft by viewModel.usernameDraft.collectAsState()
+    val avatarDraft by viewModel.avatarDraft.collectAsState()
     val myUsername by viewModel.myUsernameState.collectAsState()
+    val myAvatarIndex by viewModel.myAvatarState.collectAsState()
 
     var showSecurityVerificationDialog by remember { mutableStateOf<UserEntity?>(null) }
 
@@ -74,6 +76,47 @@ fun ChatApp(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { viewModel.saveProfile() })
                     )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text("Choisissez votre avatar / photo de profil :", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AvatarRegistry.avatars.forEach { avatar ->
+                            val isSelected = avatar.id == avatarDraft
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else Color.Transparent)
+                                    .clickable { viewModel.updateAvatarDraft(avatar.id) }
+                                    .padding(4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AvatarView(
+                                    index = avatar.id,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.25f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -208,6 +251,7 @@ fun ChatApp(
                 UserListPane(
                     myId = viewModel.myId,
                     myUsername = myUsername,
+                    myAvatarIndex = myAvatarIndex,
                     myFingerprint = viewModel.myKeyFingerprint,
                     users = users,
                     selectedUser = selectedUser,
@@ -271,6 +315,7 @@ fun ChatApp(
                     UserListPane(
                         myId = viewModel.myId,
                         myUsername = myUsername,
+                        myAvatarIndex = myAvatarIndex,
                         myFingerprint = viewModel.myKeyFingerprint,
                         users = users,
                         selectedUser = null,
@@ -290,6 +335,7 @@ fun ChatApp(
 fun UserListPane(
     myId: String,
     myUsername: String,
+    myAvatarIndex: Int,
     myFingerprint: String,
     users: List<UserEntity>,
     selectedUser: UserEntity?,
@@ -358,19 +404,10 @@ fun UserListPane(
                         .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "User",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    AvatarView(
+                        index = myAvatarIndex,
+                        modifier = Modifier.size(44.dp)
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -465,24 +502,10 @@ fun UserListPane(
                         ) {
                             // Avatar with online signal overlay
                             Box(modifier = Modifier.size(46.dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            if (user.isOnline) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                            else MaterialTheme.colorScheme.surfaceVariant,
-                                            CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    val userLetter = user.username.firstOrNull()?.toString()?.uppercase() ?: "?"
-                                    Text(
-                                        text = userLetter,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (user.isOnline) MaterialTheme.colorScheme.primary else Color.Gray
-                                    )
-                                }
+                                AvatarView(
+                                    index = user.avatarIndex,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                                 
                                 // Green online pulsing badge
                                 if (user.isOnline) {
@@ -577,6 +600,11 @@ fun ActiveChatPane(
                         modifier = Modifier.clickable { onShowSecurityKeys(recipient) },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        AvatarView(
+                            index = recipient.avatarIndex,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
                                 text = recipient.username,
@@ -975,6 +1003,89 @@ fun PulsingOnlineDot(
                 .fillMaxSize()
                 .scale(scale)
                 .background(color, CircleShape)
+        )
+    }
+}
+
+data class AvatarStyle(
+    val id: Int,
+    val name: String,
+    val brush: androidx.compose.ui.graphics.Brush,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val tintColor: Color = Color.White
+)
+
+object AvatarRegistry {
+    val avatars = listOf(
+        AvatarStyle(
+            id = 0,
+            name = "Le Gardien",
+            brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF3F51B5), Color(0xFF00BCD4))),
+            icon = Icons.Default.Shield
+        ),
+        AvatarStyle(
+            id = 1,
+            name = "L'Infiltré",
+            brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF2196F3), Color(0xFF009688))),
+            icon = Icons.Default.Security
+        ),
+        AvatarStyle(
+            id = 2,
+            name = "Le Scribe",
+            brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF9C27B0), Color(0xFFE91E63))),
+            icon = Icons.Default.Lock
+        ),
+        AvatarStyle(
+            id = 3,
+            name = "L'Agent Spécial",
+            brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF673AB7), Color(0xFF3F51B5))),
+            icon = Icons.Default.Person
+        ),
+        AvatarStyle(
+            id = 4,
+            name = "L'Expert",
+            brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF4CAF50), Color(0xFF8BC34A))),
+            icon = Icons.Default.CheckCircle
+        ),
+        AvatarStyle(
+            id = 5,
+            name = "Le Diplomate",
+            brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFFF9800), Color(0xFFFFC107))),
+            icon = Icons.Default.Verified
+        ),
+        AvatarStyle(
+            id = 6,
+            name = "L'Éclaireur",
+            brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF795548), Color(0xFFFF5722))),
+            icon = Icons.Default.Star
+        ),
+        AvatarStyle(
+            id = 7,
+            name = "Le Phoenix",
+            brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFF44336), Color(0xFFE91E63))),
+            icon = Icons.Default.Favorite
+        )
+    )
+
+    fun getAvatar(id: Int): AvatarStyle {
+        return avatars.getOrElse(id) { avatars[0] }
+    }
+}
+
+@Composable
+fun AvatarView(index: Int, modifier: Modifier = Modifier) {
+    val avatar = AvatarRegistry.getAvatar(index)
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(avatar.brush),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = avatar.icon,
+            contentDescription = avatar.name,
+            tint = avatar.tintColor,
+            modifier = Modifier.fillMaxSize(0.55f)
         )
     }
 }

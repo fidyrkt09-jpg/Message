@@ -31,6 +31,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _myUsernameState = MutableStateFlow(chatRepository.myUsername)
     val myUsernameState: StateFlow<String> = _myUsernameState.asStateFlow()
 
+    // Live state flow of our local avatar index
+    private val _myAvatarState = MutableStateFlow(chatRepository.myAvatarIndex)
+    val myAvatarState: StateFlow<Int> = _myAvatarState.asStateFlow()
+
     // Selected user for active conversation
     private val _selectedUser = MutableStateFlow<UserEntity?>(null)
     val selectedUser: StateFlow<UserEntity?> = _selectedUser.asStateFlow()
@@ -46,6 +50,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     // Temporary name for the profile editing text field
     private val _usernameDraft = MutableStateFlow("")
     val usernameDraft: StateFlow<String> = _usernameDraft.asStateFlow()
+
+    // Temporary avatar index for the profile editor picker
+    private val _avatarDraft = MutableStateFlow(chatRepository.myAvatarIndex)
+    val avatarDraft: StateFlow<Int> = _avatarDraft.asStateFlow()
 
     // Global peer directory list
     val usersList: StateFlow<List<UserEntity>> = chatRepository.activeUsersFlow
@@ -82,6 +90,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openProfileEditor() {
         _usernameDraft.value = _myUsernameState.value
+        _avatarDraft.value = _myAvatarState.value
         _editingProfile.value = true
     }
 
@@ -91,15 +100,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveProfile() {
         val newName = _usernameDraft.value.trim()
+        val avatarIndex = _avatarDraft.value
         if (newName.isNotEmpty()) {
-            chatRepository.updateUsername(newName)
+            chatRepository.updateProfile(newName, avatarIndex)
             _myUsernameState.value = chatRepository.myUsername
+            _myAvatarState.value = chatRepository.myAvatarIndex
         }
         _editingProfile.value = false
     }
 
     fun updateUsernameDraft(draft: String) {
         _usernameDraft.value = draft
+    }
+
+    fun updateAvatarDraft(index: Int) {
+        _avatarDraft.value = index
     }
 
     fun manualRefreshDiscovery() {

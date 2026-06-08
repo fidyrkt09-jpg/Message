@@ -9,7 +9,8 @@ data class UserEntity(
     val username: String,
     val publicKey: String,
     val lastSeen: Long,
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    val avatarIndex: Int = 0
 ) {
     val publicKeyFingerprint: String
         get() = if (publicKey.length > 16) {

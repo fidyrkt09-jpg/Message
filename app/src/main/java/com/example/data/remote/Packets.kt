@@ -8,7 +8,8 @@ data class PresencePacket(
     val userId: String,
     val username: String,
     val publicKey: String,
-    val timestamp: Long
+    val timestamp: Long,
+    val avatarIndex: Int = 0
 )
 
 // Packet circulated to send a bulletproof E2EE message

@@ -12,6 +12,7 @@ import com.example.data.remote.EncryptedMessagePacket
 import com.example.data.remote.NtfyService
 import com.example.data.remote.PacketParser
 import com.example.data.remote.PresencePacket
+import com.example.NotificationHelper
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import java.security.KeyFactory
@@ -34,6 +35,7 @@ class ChatRepository(
         private const val KEY_MY_USERNAME = "my_username"
         private const val KEY_PRIVATE_KEY = "my_private_key"
         private const val KEY_PUBLIC_KEY = "my_public_key"
+        private const val KEY_MY_AVATAR_INDEX = "my_avatar_index"
 
         // Unique discovery channels for AI Studio real-time playground
         private const val CLAN_TOPIC_PREFIX = "aistudio_secchat"
@@ -47,6 +49,9 @@ class ChatRepository(
         private set
 
     var myUsername: String = ""
+        private set
+
+    var myAvatarIndex: Int = 0
         private set
 
     private var myPrivateKey: PrivateKey? = null
@@ -67,12 +72,14 @@ class ChatRepository(
         val savedUsername = prefs.getString(KEY_MY_USERNAME, null)
         val savedPrivKeyBase64 = prefs.getString(KEY_PRIVATE_KEY, null)
         val savedPubKeyBase64 = prefs.getString(KEY_PUBLIC_KEY, null)
+        val savedAvatarIndex = prefs.getInt(KEY_MY_AVATAR_INDEX, 0)
 
         if (savedId != null && savedUsername != null && savedPrivKeyBase64 != null && savedPubKeyBase64 != null) {
             try {
                 myId = savedId
                 myUsername = savedUsername
                 myPublicKeyBase64 = savedPubKeyBase64
+                myAvatarIndex = savedAvatarIndex
 
                 val keyFactory = KeyFactory.getInstance("RSA")
                 
@@ -98,6 +105,7 @@ class ChatRepository(
         val randomSuffix = UUID.randomUUID().toString().substring(0, 5)
         myId = "usr_$randomSuffix"
         myUsername = "User_$randomSuffix"
+        myAvatarIndex = (0..7).random()
 
         Log.i(TAG, "Generating custom RSA-2048 E2EE Cryptographic Keypair...")
         val keyPair: KeyPair = CryptoHelper.generateRsaKeyPair()
@@ -110,6 +118,7 @@ class ChatRepository(
         prefs.edit()
             .putString(KEY_MY_ID, myId)
             .putString(KEY_MY_USERNAME, myUsername)
+            .putInt(KEY_MY_AVATAR_INDEX, myAvatarIndex)
             .putString(KEY_PRIVATE_KEY, privBase64)
             .putString(KEY_PUBLIC_KEY, myPublicKeyBase64)
             .apply()
@@ -118,9 +127,13 @@ class ChatRepository(
     }
 
     // Expose local identity settings update
-    fun updateUsername(newUsername: String) {
+    fun updateProfile(newUsername: String, newAvatarIndex: Int) {
         myUsername = newUsername.trim().ifEmpty { myUsername }
-        prefs.edit().putString(KEY_MY_USERNAME, myUsername).apply()
+        myAvatarIndex = newAvatarIndex
+        prefs.edit()
+            .putString(KEY_MY_USERNAME, myUsername)
+            .putInt(KEY_MY_AVATAR_INDEX, myAvatarIndex)
+            .apply()
         // Broadcast presence instantly to let others know
         broadcastPresence()
     }
@@ -144,7 +157,8 @@ class ChatRepository(
                 userId = myId,
                 username = myUsername,
                 publicKey = myPublicKeyBase64,
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
+                avatarIndex = myAvatarIndex
             )
             val json = PacketParser.serializePresence(packet)
             NtfyService.publish(DISCOVERY_TOPIC, json)
@@ -182,7 +196,8 @@ class ChatRepository(
                     username = packet.username,
                     publicKey = packet.publicKey,
                     lastSeen = System.currentTimeMillis(),
-                    isOnline = true
+                    isOnline = true,
+                    avatarIndex = packet.avatarIndex
                 )
                 // Save user directly to RoomDB
                 chatDao.insertUser(user)
@@ -262,6 +277,14 @@ class ChatRepository(
             decryptionSuccess = decryptionSuccess
         )
         chatDao.insertMessage(message)
+
+        // Trigger rich interactive tactile buzz alert and user space push-notification
+        NotificationHelper.vibrate(context)
+        NotificationHelper.showNotification(
+            context = context,
+            senderName = packet.senderUsername,
+            messageText = decryptedBody
+        )
     }
 
     // Master E2EE encryption and delivery algorithm
