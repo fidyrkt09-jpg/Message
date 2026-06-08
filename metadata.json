@@ -1,0 +1,6 @@
+{
+  "name": "Secure Messenger",
+  "description": "An advanced messaging application featuring real-time presence indicators, instant message delivery, and absolute end-to-end encryption (E2EE) using RSA + AES.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
